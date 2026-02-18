@@ -4,6 +4,10 @@ import crypto from "crypto";
 export async function getSubscription(req: any, res: any) {
   const { telegramId } = req.params;
 
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   try {
     const user = await prisma.user.findUnique({
       where: { telegramId }
