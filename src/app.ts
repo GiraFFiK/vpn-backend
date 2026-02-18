@@ -11,12 +11,19 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// API Routes
+// API Routes (с /api)
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/subscription", subscriptionRoutes);
 app.use("/api/referral", referralRoutes);
 app.use("/api/activation", activationRoutes);
+
+// 👇 ДОБАВЬТЕ ЭТИ СТРОКИ - поддержка без /api
+app.use("/auth", authRoutes);
+app.use("/users", userRoutes);
+app.use("/subscription", subscriptionRoutes);
+app.use("/referral", referralRoutes);
+app.use("/activation", activationRoutes);
 
 app.get("/health", (_, res) => {
   res.json({ ok: true, timestamp: new Date().toISOString() });
