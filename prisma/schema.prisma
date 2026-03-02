@@ -15,6 +15,9 @@ model User {
   lastName          String?
   photoUrl          String?
   
+  // Баланс звезд (НОВОЕ ПОЛЕ)
+  starsBalance      Int      @default(0)
+  
   // Подписка
   subscriptionUntil DateTime?
   

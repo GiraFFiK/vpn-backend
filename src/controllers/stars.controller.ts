@@ -12,12 +12,8 @@ export async function getStarsBalance(req: any, res: any) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Здесь нужно получать реальный баланс звезд из Telegram API
-    // Пока используем тестовые данные
-    // В будущем здесь будет запрос к Telegram API
-    
     res.json({
-      balance: 150, // Реальный баланс из Telegram
+      balance: user.starsBalance || 0,
       telegramId: user.telegramId
     });
   } catch (error) {
@@ -26,21 +22,34 @@ export async function getStarsBalance(req: any, res: any) {
   }
 }
 
-// Эндпоинт для списания звезд (будет вызываться после подтверждения покупки)
-export async function deductStars(req: any, res: any) {
+// Эндпоинт для обновления баланса (например, после пополнения через бота)
+export async function updateStarsBalance(req: any, res: any) {
   const { telegramId } = req.params;
-  const { amount } = req.body;
+  const { amount } = req.body; // amount может быть положительным (пополнение) или отрицательным (списание)
 
   try {
-    // Здесь должен быть вызов Telegram API для списания звезд
-    // TODO: Интеграция с Telegram Stars API
-    
-    console.log(`✅ Списано ${amount} звезд у пользователя ${telegramId}`);
-    
+    const user = await prisma.user.findUnique({
+      where: { telegramId }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { telegramId },
+      data: {
+        starsBalance: {
+          increment: amount
+        }
+      }
+    });
+
+    console.log(`💰 Баланс пользователя ${telegramId} изменен на ${amount}. Новый баланс: ${updatedUser.starsBalance}`);
+
     res.json({
       success: true,
-      deducted: amount,
-      newBalance: 150 - amount // тестовый новый баланс
+      newBalance: updatedUser.starsBalance
     });
   } catch (error) {
     console.error(error);
