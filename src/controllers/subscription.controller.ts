@@ -1,6 +1,32 @@
 import { prisma } from "../prisma";
 import crypto from "crypto";
 
+export async function getSubscription(req: any, res: any) {
+  const { telegramId } = req.params;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { telegramId }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const now = new Date();
+    const isActive = user.subscriptionUntil ? user.subscriptionUntil > now : false;
+
+    res.json({
+      isActive,
+      subscriptionUntil: user.subscriptionUntil,
+      daysLeft: isActive ? Math.ceil((user.subscriptionUntil!.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Server error" });
+  }
+}
+
 export async function purchaseSubscription(req: any, res: any) {
   const { telegramId } = req.params;
   const { plan, stars } = req.body;
