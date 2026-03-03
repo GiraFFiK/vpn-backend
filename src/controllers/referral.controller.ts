@@ -254,3 +254,26 @@ export async function activateBonus(req: any, res: any) {
     res.status(500).json({ error: "Server error" });
   }
 }
+
+export async function getUserByReferralCode(req: any, res: any) {
+  const { referralCode } = req.params;
+
+  try {
+    console.log("🔍 Поиск пользователя по referralCode:", referralCode);
+    
+    const user = await prisma.user.findUnique({
+      where: { referralCode }
+    });
+
+    if (!user) {
+      console.log("❌ Пользователь не найден");
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    console.log("✅ Пользователь найден:", user.telegramId);
+    res.json({ telegramId: user.telegramId });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Server error" });
+  }
+}
