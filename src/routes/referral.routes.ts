@@ -10,4 +10,3 @@ router.post("/bonus", activateBonus);
 
 export default router;
 
-//
