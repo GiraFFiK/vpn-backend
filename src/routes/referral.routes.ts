@@ -4,7 +4,7 @@ import { getReferralInfo, activateReferral, activateBonus, getUserByReferralCode
 const router = Router();
 
 router.get("/:telegramId", getReferralInfo);
-router.get("/by-referral/:referralCode", getUserByReferralCode);
+router.get("/user/by-referral/:referralCode", getUserByReferralCode);
 router.post("/activate", activateReferral);
 router.post("/bonus", activateBonus);
 
