@@ -39,23 +39,28 @@ export async function getReferralInfo(req: any, res: any) {
       invitedList
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error in getReferralInfo:", error);
     res.status(500).json({ error: "Server error" });
   }
 }
 
-// Эндпоинт для активации реферального кода (вызывается из бота)
 export async function activateReferral(req: any, res: any) {
   const { referralCode, newUserId } = req.body;
 
   try {
+    console.log("🔄 Активация реферального кода:", referralCode, "для пользователя:", newUserId);
+
+    // Ищем пригласившего по реферальному коду
     const referrer = await prisma.user.findUnique({
       where: { referralCode }
     });
 
     if (!referrer) {
+      console.log("❌ Реферальный код не найден:", referralCode);
       return res.status(404).json({ error: "Invalid referral code" });
     }
+
+    console.log("✅ Пригласивший найден:", referrer.telegramId);
 
     // Проверяем, не приглашал ли уже этот пользователь
     const existingInvite = await (prisma as any).invitedUser.findUnique({
@@ -63,10 +68,11 @@ export async function activateReferral(req: any, res: any) {
     });
 
     if (existingInvite) {
+      console.log("❌ Пользователь уже был приглашен:", newUserId);
       return res.status(400).json({ error: "User already invited" });
     }
 
-    // Сохраняем информацию о приглашении, но бонус начислится при первой активации
+    // Создаем запись о приглашении
     await (prisma as any).invitedUser.create({
       data: {
         referrerId: referrer.telegramId,
@@ -75,23 +81,24 @@ export async function activateReferral(req: any, res: any) {
       }
     });
 
-    console.log(`📝 Пользователь ${newUserId} был приглашен ${referrer.telegramId}`);
+    console.log(`✅ Запись о приглашении создана: ${referrer.telegramId} -> ${newUserId}`);
 
     res.json({ 
       success: true, 
       message: "Referral recorded. Bonus will be given upon first activation." 
     });
   } catch (error) {
-    console.error(error);
+    console.error("❌ Error in activateReferral:", error);
     res.status(500).json({ error: "Server error" });
   }
 }
 
-// Эндпоинт для ручной активации бонуса (если нужно)
 export async function activateBonus(req: any, res: any) {
   const { userId } = req.body;
 
   try {
+    console.log("🔄 Активация бонуса для пользователя:", userId);
+
     const user = await prisma.user.findUnique({
       where: { telegramId: userId }
     });
@@ -100,20 +107,24 @@ export async function activateBonus(req: any, res: any) {
       return res.status(404).json({ error: "User not found" });
     }
 
+    // Проверяем, получал ли уже пользователь бонус
     if (user.hasClaimedBonus) {
       return res.status(400).json({ error: "Bonus already claimed" });
     }
 
-    // Находим, был ли пользователь приглашен
+    // Ищем, был ли пользователь приглашен
     const invite = await (prisma as any).invitedUser.findUnique({
       where: { invitedUserId: userId }
     });
 
     let bonusDays = 3; // Базовый бонус
 
+    // Если пользователь был приглашен, добавляем дополнительный бонус
     if (invite) {
       bonusDays = 6; // 3 базовых + 3 за приглашение
       
+      console.log("🎁 Пользователь был приглашен, обновляем статус приглашения");
+
       // Обновляем статус приглашения
       await (prisma as any).invitedUser.update({
         where: { invitedUserId: userId },
@@ -130,6 +141,8 @@ export async function activateBonus(req: any, res: any) {
       });
 
       if (referrer) {
+        console.log("🎁 Начисляем бонус пригласившему:", referrer.telegramId);
+        
         const referrerCurrentDate = referrer.subscriptionUntil || new Date();
         const referrerNewDate = new Date(referrerCurrentDate.getTime() + (3 * 24 * 60 * 60 * 1000));
         
@@ -144,6 +157,8 @@ export async function activateBonus(req: any, res: any) {
     }
 
     // Начисляем бонус пользователю
+    console.log(`🎁 Начисляем ${bonusDays} дней пользователю ${userId}`);
+    
     const currentDate = user.subscriptionUntil || new Date();
     const newDate = new Date(currentDate.getTime() + (bonusDays * 24 * 60 * 60 * 1000));
     
@@ -155,7 +170,7 @@ export async function activateBonus(req: any, res: any) {
       }
     });
 
-    console.log(`🎉 Пользователь ${userId} активировал бонус: +${bonusDays} дней`);
+    console.log(`✅ Бонус активирован: +${bonusDays} дней для ${userId}`);
 
     res.json({ 
       success: true, 
@@ -163,7 +178,7 @@ export async function activateBonus(req: any, res: any) {
       message: `Bonus activated: +${bonusDays} days` 
     });
   } catch (error) {
-    console.error(error);
+    console.error("❌ Error in activateBonus:", error);
     res.status(500).json({ error: "Server error" });
   }
 }
