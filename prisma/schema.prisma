@@ -20,6 +20,9 @@ model User {
   
   // Подписка
   subscriptionUntil DateTime?
+
+  // Флаг первого входа (НОВОЕ)
+  hasClaimedBonus   Boolean  @default(false)
   
   // Реферальная система
   referralCode      String   @unique
