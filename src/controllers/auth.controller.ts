@@ -1,4 +1,5 @@
 import { prisma } from "../prisma";
+import { verifyTelegram } from "../middlewares/telegramAuth";
 import crypto from "crypto";
 
 export async function auth(req: any, res: any) {
@@ -27,7 +28,6 @@ export async function auth(req: any, res: any) {
     });
 
     // Проверяем, был ли пользователь приглашен кем-то
-    // invitedBy должен быть строкой (telegramId)
     const invitedBy = userData.invitedBy ? String(userData.invitedBy) : null;
 
     if (!dbUser) {
@@ -41,12 +41,21 @@ export async function auth(req: any, res: any) {
           firstName: firstName,
           lastName: lastName,
           referralCode: referralCode,
-          invitedBy: invitedBy // теперь это строка
+          invitedBy: invitedBy
         }
       });
 
       // Начисляем бонус за первый вход
+      console.log("🎁 Вызов handleFirstTimeBonus для нового пользователя:", userId);
       await handleFirstTimeBonus(dbUser.telegramId, invitedBy);
+    } else {
+      console.log("👤 Пользователь уже существует, проверяем бонус...");
+      
+      // Проверяем, получал ли пользователь бонус
+      if (!dbUser.hasClaimedBonus) {
+        console.log("🎁 Пользователь не получал бонус, начисляем...");
+        await handleFirstTimeBonus(dbUser.telegramId, invitedBy);
+      }
     }
 
     res.json(dbUser);
@@ -59,49 +68,76 @@ export async function auth(req: any, res: any) {
 // Функция для обработки бонуса за первый вход
 async function handleFirstTimeBonus(newUserId: string, invitedBy: string | null) {
   try {
+    console.log("🎁 ===== НАЧАЛО НАЧИСЛЕНИЯ БОНУСА =====");
+    console.log("📨 Данные:", { newUserId, invitedBy });
+
     const BONUS_DAYS = 3;
 
     const newUser = await prisma.user.findUnique({
       where: { telegramId: newUserId }
     });
 
-    if (!newUser) return;
+    if (!newUser) {
+      console.log("❌ Новый пользователь не найден:", newUserId);
+      return;
+    }
 
     let totalBonusDays = BONUS_DAYS;
+    console.log("📊 Базовый бонус:", BONUS_DAYS, "дней");
 
+    // Проверяем, был ли пользователь приглашен
     if (invitedBy) {
-      totalBonusDays += 3;
-
-      const referrer = await prisma.user.findUnique({
-        where: { telegramId: invitedBy }
+      console.log("🔍 Пользователь был приглашен, ищем приглашение...");
+      
+      // Ищем запись о приглашении
+      const invite = await (prisma as any).invitedUser.findUnique({
+        where: { invitedUserId: newUserId }
       });
 
-      if (referrer) {
-        const referrerCurrentDate = referrer.subscriptionUntil || new Date();
-        const referrerNewDate = new Date(referrerCurrentDate.getTime() + (3 * 24 * 60 * 60 * 1000));
-        
-        await prisma.user.update({
-          where: { telegramId: invitedBy },
-          data: {
-            subscriptionUntil: referrerNewDate,
-            referralBonus: { increment: 3 }
-          }
-        });
+      if (invite) {
+        console.log("✅ Приглашение найдено:", invite);
+        totalBonusDays += 3; // +3 дня за переход по ссылке
+        console.log("📊 Добавлен бонус за приглашение: +3 дня");
+        console.log("📊 Итоговый бонус:", totalBonusDays, "дней");
 
-        await (prisma as any).invitedUser.create({
+        // Обновляем статус приглашения
+        console.log("📝 Обновление статуса приглашения...");
+        await (prisma as any).invitedUser.update({
+          where: { invitedUserId: newUserId },
           data: {
-            referrerId: invitedBy,
-            invitedUserId: newUserId,
             status: "activated",
-            bonusGiven: true,
-            activatedAt: new Date()
+            activatedAt: new Date(),
+            bonusGiven: true
           }
         });
 
-        console.log(`✅ Пригласивший ${invitedBy} получил +3 дня за приглашение ${newUserId}`);
+        // Начисляем бонус пригласившему
+        console.log("🔍 Поиск пригласившего:", invite.referrerId);
+        const referrer = await prisma.user.findUnique({
+          where: { telegramId: invite.referrerId }
+        });
+
+        if (referrer) {
+          console.log("✅ Пригласивший найден:", referrer.telegramId);
+          const referrerCurrentDate = referrer.subscriptionUntil || new Date();
+          const referrerNewDate = new Date(referrerCurrentDate.getTime() + (3 * 24 * 60 * 60 * 1000));
+          
+          await prisma.user.update({
+            where: { telegramId: invite.referrerId },
+            data: {
+              subscriptionUntil: referrerNewDate,
+              referralBonus: { increment: 3 }
+            }
+          });
+          console.log("✅ Бонус пригласившему начислен");
+        }
+      } else {
+        console.log("⚠️ Приглашение не найдено в базе для пользователя:", newUserId);
       }
     }
 
+    // Начисляем бонус новому пользователю
+    console.log("📝 Начисление бонуса пользователю...");
     const currentDate = newUser.subscriptionUntil || new Date();
     const newDate = new Date(currentDate.getTime() + (totalBonusDays * 24 * 60 * 60 * 1000));
     
@@ -113,8 +149,10 @@ async function handleFirstTimeBonus(newUserId: string, invitedBy: string | null)
       }
     });
 
-    console.log(`✅ Новый пользователь ${newUserId} получил ${totalBonusDays} дней бонуса`);
+    console.log(`✅ Бонус начислен: +${totalBonusDays} дней для ${newUserId}`);
+    console.log("📅 Новая дата подписки:", newDate);
+    console.log("🎁 ===== НАЧИСЛЕНИЕ БОНУСА ЗАВЕРШЕНО =====\n");
   } catch (error) {
-    console.error("Ошибка при начислении бонуса:", error);
+    console.error("❌ Ошибка при начислении бонуса:", error);
   }
 }
