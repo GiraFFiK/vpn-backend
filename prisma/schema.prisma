@@ -15,27 +15,23 @@ model User {
   lastName          String?
   photoUrl          String?
   
-  // Баланс звезд (НОВОЕ ПОЛЕ)
+  // Баланс звезд
   starsBalance      Int      @default(0)
   
   // Подписка
   subscriptionUntil DateTime?
 
-  // Флаг первого входа (НОВОЕ)
+  // Флаг первого входа
   hasClaimedBonus   Boolean  @default(false)
   
   // Реферальная система
   referralCode      String   @unique
-  invitedBy         Int? // telegramId пригласившего (пока не используем)
+  invitedBy         String?  // telegramId пригласившего
   referralBonus     Int      @default(0)
   
   // Связи
-  // Пользователи, которых пригласил этот пользователь
   invitedUsers      InvitedUser[] @relation("Referrer")
-  
-  // Пользователь, который пригласил этого пользователя
   invitedByUser     InvitedUser?  @relation("Invited")
-  
   purchases         Purchase[]
   activationCodes   ActivationCode[]
   

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "User" ALTER COLUMN "invitedBy" SET DATA TYPE TEXT;
