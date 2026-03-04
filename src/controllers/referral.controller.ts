@@ -12,10 +12,10 @@ export async function getReferralInfo(req: any, res: any) {
       include: {
         invitedUsers: {
           include: {
-            invitedUser: true
-          }
-        }
-      }
+            invitedUser: true,
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -28,22 +28,25 @@ export async function getReferralInfo(req: any, res: any) {
 
     const referralLink = `https://t.me/${process.env.BOT_USERNAME}?start=ref_${user.referralCode}`;
 
-    const invitedList = user.invitedUsers.map(inv => ({
+    const invitedList = user.invitedUsers.map((inv) => ({
       id: inv.id,
       username: inv.invitedUser.username,
       firstName: inv.invitedUser.firstName,
-      date: inv.invitedAt.toLocaleDateString('ru-RU'),
+      photoUrl: inv.invitedUser.photoUrl, // Добавьте эту строку
+      date: inv.invitedAt.toLocaleDateString("ru-RU"),
       status: inv.status,
-      bonus: inv.bonusGiven ? 3 : 0
+      bonus: inv.bonusGiven ? 3 : 0,
     }));
 
     res.json({
       referralCode: user.referralCode,
       referralLink,
       totalInvited: user.invitedUsers.length,
-      activatedCount: user.invitedUsers.filter(inv => inv.status === "activated").length,
+      activatedCount: user.invitedUsers.filter(
+        (inv) => inv.status === "activated",
+      ).length,
       totalBonus: user.referralBonus,
-      invitedList
+      invitedList,
     });
   } catch (error) {
     console.error("❌ Ошибка в getReferralInfo:", error);
@@ -66,7 +69,7 @@ export async function activateReferral(req: any, res: any) {
     // Ищем пригласившего по реферальному коду
     console.log("🔍 Поиск пользователя с referralCode:", referralCode);
     const referrer = await prisma.user.findUnique({
-      where: { referralCode }
+      where: { referralCode },
     });
 
     if (!referrer) {
@@ -82,21 +85,24 @@ export async function activateReferral(req: any, res: any) {
     // 1. Проверяем, существует ли пользователь с таким newUserId
     console.log("🔍 Проверка существования пользователя с ID:", newUserId);
     let newUser = await prisma.user.findUnique({
-      where: { telegramId: newUserId }
+      where: { telegramId: newUserId },
     });
 
     // 2. Если пользователя нет - создаем его
     if (!newUser) {
       console.log("📝 Пользователь не найден, создаем нового...");
-      const newReferralCode = crypto.randomBytes(4).toString('hex').toUpperCase();
-      
+      const newReferralCode = crypto
+        .randomBytes(4)
+        .toString("hex")
+        .toUpperCase();
+
       newUser = await prisma.user.create({
         data: {
           telegramId: newUserId,
           referralCode: newReferralCode,
           username: `user_${newUserId}`,
           firstName: "User",
-        }
+        },
       });
       console.log("✅ Новый пользователь создан:", newUser.telegramId);
     } else {
@@ -106,7 +112,7 @@ export async function activateReferral(req: any, res: any) {
     // 3. Проверяем, не приглашал ли уже этот пользователь
     console.log("🔍 Проверка существующего приглашения для:", newUserId);
     const existingInvite = await (prisma as any).invitedUser.findUnique({
-      where: { invitedUserId: newUserId }
+      where: { invitedUserId: newUserId },
     });
 
     if (existingInvite) {
@@ -122,8 +128,8 @@ export async function activateReferral(req: any, res: any) {
       data: {
         referrerId: referrer.telegramId,
         invitedUserId: newUserId,
-        status: "pending"
-      }
+        status: "pending",
+      },
     });
 
     console.log("✅ Запись о приглашении создана:");
@@ -133,9 +139,9 @@ export async function activateReferral(req: any, res: any) {
     console.log("   - status:", newInvite.status);
     console.log("🔄 ===== АКТИВАЦИЯ ЗАВЕРШЕНА УСПЕШНО =====\n");
 
-    res.json({ 
-      success: true, 
-      message: "Referral recorded. Bonus will be given upon first activation." 
+    res.json({
+      success: true,
+      message: "Referral recorded. Bonus will be given upon first activation.",
     });
   } catch (error) {
     console.error("❌ ===== ОШИБКА В АКТИВАЦИИ =====");
@@ -158,7 +164,7 @@ export async function activateBonus(req: any, res: any) {
     }
 
     const user = await prisma.user.findUnique({
-      where: { telegramId: userId }
+      where: { telegramId: userId },
     });
 
     if (!user) {
@@ -179,7 +185,7 @@ export async function activateBonus(req: any, res: any) {
 
     console.log("🔍 Поиск приглашения для пользователя:", userId);
     const invite = await (prisma as any).invitedUser.findUnique({
-      where: { invitedUserId: userId }
+      where: { invitedUserId: userId },
     });
 
     let bonusDays = 3;
@@ -198,29 +204,34 @@ export async function activateBonus(req: any, res: any) {
         data: {
           status: "activated",
           activatedAt: new Date(),
-          bonusGiven: true
-        }
+          bonusGiven: true,
+        },
       });
 
       console.log("🔍 Поиск пригласившего:", invite.referrerId);
       const referrer = await prisma.user.findUnique({
-        where: { telegramId: invite.referrerId }
+        where: { telegramId: invite.referrerId },
       });
 
       if (referrer) {
         console.log("✅ Пригласивший найден:", referrer.telegramId);
-        console.log("📊 Текущая подписка пригласившего:", referrer.subscriptionUntil);
-        
+        console.log(
+          "📊 Текущая подписка пригласившего:",
+          referrer.subscriptionUntil,
+        );
+
         const referrerCurrentDate = referrer.subscriptionUntil || new Date();
-        const referrerNewDate = new Date(referrerCurrentDate.getTime() + (3 * 24 * 60 * 60 * 1000));
-        
+        const referrerNewDate = new Date(
+          referrerCurrentDate.getTime() + 3 * 24 * 60 * 60 * 1000,
+        );
+
         console.log("📝 Начисление бонуса пригласившему...");
         await prisma.user.update({
           where: { telegramId: invite.referrerId },
           data: {
             subscriptionUntil: referrerNewDate,
-            referralBonus: { increment: 3 }
-          }
+            referralBonus: { increment: 3 },
+          },
         });
         console.log("✅ Бонус пригласившему начислен");
       }
@@ -228,24 +239,26 @@ export async function activateBonus(req: any, res: any) {
 
     console.log("📝 Начисление бонуса пользователю...");
     const currentDate = user.subscriptionUntil || new Date();
-    const newDate = new Date(currentDate.getTime() + (bonusDays * 24 * 60 * 60 * 1000));
-    
+    const newDate = new Date(
+      currentDate.getTime() + bonusDays * 24 * 60 * 60 * 1000,
+    );
+
     await prisma.user.update({
       where: { telegramId: userId },
       data: {
         subscriptionUntil: newDate,
-        hasClaimedBonus: true
-      }
+        hasClaimedBonus: true,
+      },
     });
 
     console.log(`✅ Бонус активирован: +${bonusDays} дней для ${userId}`);
     console.log("📅 Новая дата подписки:", newDate);
     console.log("🎁 ===== АКТИВАЦИЯ БОНУСА ЗАВЕРШЕНА =====\n");
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       bonusDays,
-      message: `Bonus activated: +${bonusDays} days` 
+      message: `Bonus activated: +${bonusDays} days`,
     });
   } catch (error) {
     console.error("❌ ===== ОШИБКА В АКТИВАЦИИ БОНУСА =====");
@@ -260,9 +273,9 @@ export async function getUserByReferralCode(req: any, res: any) {
 
   try {
     console.log("🔍 Поиск пользователя по referralCode:", referralCode);
-    
+
     const user = await prisma.user.findUnique({
-      where: { referralCode }
+      where: { referralCode },
     });
 
     if (!user) {
