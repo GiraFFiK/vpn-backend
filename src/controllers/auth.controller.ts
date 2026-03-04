@@ -18,7 +18,7 @@ export async function auth(req: any, res: any) {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    const username = userData.user?.username || userData.username || "user";
+    const username = userData.user?.username || userData.username || "";
     const firstName = userData.user?.first_name || userData.first_name || "User";
     const lastName = userData.user?.last_name || userData.last_name || "";
 
@@ -49,7 +49,27 @@ export async function auth(req: any, res: any) {
       console.log("🎁 Вызов handleFirstTimeBonus для нового пользователя:", userId);
       await handleFirstTimeBonus(dbUser.telegramId, invitedBy);
     } else {
-      console.log("👤 Пользователь уже существует, проверяем бонус...");
+      console.log("👤 Пользователь уже существует, проверяем данные...");
+      
+      // Проверяем, нужно ли обновить данные пользователя
+      // (если username начинается с "user_" или firstName "User")
+      const needsUpdate = 
+        (dbUser.username?.startsWith('user_') && username) ||
+        (dbUser.firstName === "User" && firstName !== "User") ||
+        (dbUser.lastName === "" && lastName);
+
+      if (needsUpdate) {
+        console.log("📝 Обновляем данные пользователя...");
+        dbUser = await prisma.user.update({
+          where: { telegramId: String(userId) },
+          data: {
+            username: username || dbUser.username,
+            firstName: firstName || dbUser.firstName,
+            lastName: lastName || dbUser.lastName
+          }
+        });
+        console.log("✅ Данные обновлены:", { username, firstName, lastName });
+      }
       
       // Проверяем, получал ли пользователь бонус
       if (!dbUser.hasClaimedBonus) {
