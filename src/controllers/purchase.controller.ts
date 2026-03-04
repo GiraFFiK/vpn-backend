@@ -101,7 +101,7 @@ export async function getFullHistory(req: any, res: any) {
       orderBy: { purchasedAt: 'desc' }
     });
 
-    // Получаем информацию о пользователе для бонусов
+    // Получаем информацию о пользователе
     const user = await prisma.user.findUnique({
       where: { telegramId },
       include: {
@@ -117,6 +117,18 @@ export async function getFullHistory(req: any, res: any) {
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
+
+    // Проверяем, был ли пользователь приглашен (ищем запись в InvitedUser)
+    const wasInvited = await (prisma as any).invitedUser.findUnique({
+      where: { invitedUserId: telegramId }
+    });
+
+    console.log("🔍 Информация о пользователе:", {
+      telegramId,
+      hasClaimedBonus: user.hasClaimedBonus,
+      wasInvited: !!wasInvited,
+      invitedBy: wasInvited?.referrerId
+    });
 
     // Формируем полную историю
     const history: any[] = [];
@@ -137,19 +149,12 @@ export async function getFullHistory(req: any, res: any) {
       });
     });
 
-    // Определяем общее количество бонусных дней за первый вход
-    let welcomeBonusDays = 0;
-    
-    // Если пользователь получал бонус за первый вход
+    // Добавляем бонус за первый вход (с учетом приглашения)
     if (user.hasClaimedBonus) {
-      // Проверяем, был ли пользователь приглашен
-      if (user.invitedBy) {
-        welcomeBonusDays = 6; // 3 базовых + 3 за приглашение
-      } else {
-        welcomeBonusDays = 3; // только базовый бонус
-      }
-
-      // Находим дату первого бонуса (первая активность или создание пользователя)
+      // Определяем, был ли пользователь приглашен
+      const bonusDays = wasInvited ? 6 : 3;
+      
+      // Находим дату первого бонуса
       const firstActivity = await (prisma as any).purchase.findFirst({
         where: { userId: telegramId },
         orderBy: { purchasedAt: 'asc' }
@@ -159,23 +164,28 @@ export async function getFullHistory(req: any, res: any) {
         ? new Date(firstActivity.purchasedAt)
         : new Date(user.createdAt);
 
-      // Добавляем объединенный бонус за первый вход
+      // Формируем описание в зависимости от того, был ли пользователь приглашен
+      const description = wasInvited 
+        ? `🎁 Бонус за первый вход + приглашение (6 дней)`
+        : `🎁 Бонус за первый вход (3 дня)`;
+
       history.push({
         id: 'welcome_bonus',
         date: bonusDate.toLocaleDateString('ru-RU'),
         type: 'welcome_bonus',
         plan: 'bonus',
         stars: 0,
-        days: welcomeBonusDays,
-        description: user.invitedBy 
-          ? `🎁 Бонус за первый вход + приглашение (6 дней)`
-          : `🎁 Бонус за первый вход (3 дня)`,
+        days: bonusDays,
+        description: description,
         status: 'active'
       });
     }
 
     // Добавляем реферальные бонусы (за приглашение других пользователей)
     user.invitedUsers.forEach((inv: any) => {
+      // Получаем информацию о приглашенном пользователе
+      const invitedUser = inv.invitedUser;
+      
       history.push({
         id: `bonus_${inv.id}`,
         date: new Date(inv.activatedAt || inv.invitedAt).toLocaleDateString('ru-RU'),
@@ -183,7 +193,7 @@ export async function getFullHistory(req: any, res: any) {
         plan: 'bonus',
         stars: 0,
         days: 3,
-        description: `👥 Бонус за приглашение @${inv.invitedUser.username || 'пользователя'}`,
+        description: `👥 Бонус за приглашение @${invitedUser?.username || 'пользователя'}`,
         status: 'active'
       });
     });
@@ -197,8 +207,8 @@ export async function getFullHistory(req: any, res: any) {
 
     console.log(`✅ Сформировано ${history.length} записей истории`);
     console.log("📊 Детали бонусов:", {
-      welcomeBonusDays,
-      hasInvitedBy: !!user.invitedBy,
+      welcomeBonusDays: user.hasClaimedBonus ? (wasInvited ? 6 : 3) : 0,
+      wasInvited: !!wasInvited,
       referralBonuses: user.invitedUsers.length
     });
 
