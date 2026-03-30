@@ -13,6 +13,7 @@ export async function createInvoice(req: any, res: any) {
         title: "AuraVPN Подписка",
         description: `Подписка на ${plan === 'month' ? '1 месяц' : '3 месяца'}`,
         payload: JSON.stringify({ userId, plan, stars }),
+        provider_token: "",
         currency: "XTR",
         prices: [{ label: plan === 'month' ? '1 месяц' : '3 месяца', amount: stars }],
       }
