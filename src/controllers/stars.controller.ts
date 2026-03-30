@@ -12,8 +12,10 @@ export async function getStarsBalance(req: any, res: any) {
       return res.status(404).json({ error: "User not found" });
     }
 
+    // Возвращаем просто информацию, что баланс не отслеживается
     res.json({
-      balance: user.starsBalance || 0,
+      balance: null,
+      message: "Баланс звезд управляется Telegram",
       telegramId: user.telegramId
     });
   } catch (error) {
@@ -22,37 +24,10 @@ export async function getStarsBalance(req: any, res: any) {
   }
 }
 
-// Эндпоинт для обновления баланса (например, после пополнения через бота)
+// Эндпоинт для обновления баланса (оставляем для совместимости, но не используем)
 export async function updateStarsBalance(req: any, res: any) {
-  const { telegramId } = req.params;
-  const { amount } = req.body; // amount может быть положительным (пополнение) или отрицательным (списание)
-
-  try {
-    const user = await prisma.user.findUnique({
-      where: { telegramId }
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const updatedUser = await prisma.user.update({
-      where: { telegramId },
-      data: {
-        starsBalance: {
-          increment: amount
-        }
-      }
-    });
-
-    console.log(`💰 Баланс пользователя ${telegramId} изменен на ${amount}. Новый баланс: ${updatedUser.starsBalance}`);
-
-    res.json({
-      success: true,
-      newBalance: updatedUser.starsBalance
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Server error" });
-  }
+  res.json({
+    success: true,
+    message: "Баланс звезд управляется Telegram"
+  });
 }

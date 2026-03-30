@@ -40,12 +40,7 @@ export async function purchaseSubscription(req: any, res: any) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // 1. Проверяем, хватает ли звезд
-    if (user.starsBalance < stars) {
-      return res.status(400).json({ error: "Insufficient stars" });
-    }
-
-    // 2. Расчет дней в зависимости от плана
+    // Расчет дней в зависимости от плана
     const daysMap: Record<string, number> = {
       month: 30,
       "3months": 90,
@@ -55,7 +50,7 @@ export async function purchaseSubscription(req: any, res: any) {
 
     const days = daysMap[plan] || 30;
     
-    // 3. Вычисляем новую дату окончания подписки
+    // Вычисляем новую дату окончания подписки
     const now = new Date();
     let startDate = now;
     
@@ -66,18 +61,15 @@ export async function purchaseSubscription(req: any, res: any) {
     const expiresAt = new Date(startDate);
     expiresAt.setDate(expiresAt.getDate() + days);
 
-    // 4. Обновляем подписку И списываем звезды в одной транзакции
+    // Обновляем подписку
     const updatedUser = await prisma.user.update({
       where: { telegramId },
       data: {
-        subscriptionUntil: expiresAt,
-        starsBalance: {
-          decrement: stars
-        }
+        subscriptionUntil: expiresAt
       }
     });
 
-    // 5. Создаем запись о покупке
+    // Создаем запись о покупке
     await (prisma as any).purchase.create({
       data: {
         userId: telegramId,
@@ -87,11 +79,11 @@ export async function purchaseSubscription(req: any, res: any) {
       }
     });
 
-    // 6. Генерируем новый код активации
+    // Генерируем новый код активации
     const randomBytes = crypto.randomBytes(8).toString('hex').toUpperCase();
     const newCode = randomBytes.match(/.{1,4}/g)?.join('-') || randomBytes;
     
-    await (prisma as any).activationCode.upsert({
+    const activationCode = await (prisma as any).activationCode.upsert({
       where: { userId: telegramId },
       update: { code: newCode },
       create: {
@@ -100,13 +92,13 @@ export async function purchaseSubscription(req: any, res: any) {
       }
     });
 
-    console.log(`✅ Подписка оформлена для ${telegramId}: +${days} дней, списано ${stars} звезд. Новый баланс: ${updatedUser.starsBalance}`);
+    console.log(`✅ Подписка оформлена для ${telegramId}: +${days} дней, списано ${stars} звезд`);
 
     res.json({
       success: true,
       subscriptionUntil: expiresAt,
       daysLeft: days,
-      newBalance: updatedUser.starsBalance
+      activationCode: activationCode.code
     });
   } catch (error) {
     console.error(error);
