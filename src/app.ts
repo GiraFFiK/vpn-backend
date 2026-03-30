@@ -7,6 +7,7 @@ import referralRoutes from "./routes/referral.routes";
 import activationRoutes from "./routes/activation.routes";
 import starsRoutes from "./routes/stars.routes";
 import purchaseRoutes from "./routes/purchase.routes";
+import invoiceRoutes from "./routes/invoice.routes";
 
 const app = express();
 
@@ -34,6 +35,9 @@ app.use("/stars", starsRoutes); // для обратной совместимо�
 
 app.use("/api/purchases", purchaseRoutes);
 app.use("/purchases", purchaseRoutes);
+
+app.use("/api/invoice", invoiceRoutes);
+app.use("/invoice", invoiceRoutes);
 
 app.get("/health", (_, res) => {
   res.json({ ok: true, timestamp: new Date().toISOString() });
