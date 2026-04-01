@@ -1,17 +1,20 @@
 import axios from "axios";
 
-export async function sendInvoice(req: any, res: any) {
-  const { userId, plan } = req.body;
+export async function createInvoiceLink(req: any, res: any) {
+  const { userId, plan, stars } = req.body;
   const BOT_TOKEN = process.env.BOT_TOKEN;
 
   if (!BOT_TOKEN) {
-    console.error("❌ BOT_TOKEN не установлен");
-    return res.status(500).json({ success: false, error: "BOT_TOKEN missing" });
+    console.error("❌ BOT_TOKEN не установлен в .env");
+    return res.status(500).json({ 
+      success: false, 
+      error: "BOT_TOKEN missing" 
+    });
   }
 
   const prices: Record<string, number> = {
-    month: 5,      // 5 звезд для теста
-    "3months": 10, // 10 звезд для теста
+    month: 5,
+    "3months": 10,
   };
 
   const titles: Record<string, string> = {
@@ -20,38 +23,32 @@ export async function sendInvoice(req: any, res: any) {
   };
 
   try {
-    console.log("📝 Отправка инвойса пользователю:", userId, "план:", plan);
+    console.log("📝 Создание инвойса:", { userId, plan, stars });
 
     const response = await axios.post(
-      `https://api.telegram.org/bot${BOT_TOKEN}/sendInvoice`,
+      `https://api.telegram.org/bot${BOT_TOKEN}/createInvoiceLink`,
       {
-        chat_id: userId,
         title: "AuraVPN Подписка",
         description: `Подписка на ${titles[plan] || plan}`,
-        payload: JSON.stringify({ userId, plan }),
+        payload: JSON.stringify({ userId, plan, stars }),
         provider_token: "",
         currency: "XTR",
-        prices: [
-          {
-            label: titles[plan] || plan,
-            amount: prices[plan],
-          },
-        ],
+        prices: [{ label: titles[plan] || plan, amount: stars }],
       }
     );
 
-    console.log("✅ Инвойс отправлен:", response.data.result.message_id);
+    const invoiceLink = response.data.result;
+    console.log("✅ Инвойс создан, ссылка:", invoiceLink);
 
     res.json({ 
       success: true, 
-      message: "Invoice sent to bot chat",
-      result: response.data.result 
+      invoiceLink: invoiceLink 
     });
   } catch (error: any) {
-    console.error("❌ Ошибка отправки инвойса:", error.response?.data || error.message);
+    console.error("❌ Ошибка создания инвойса:", error.response?.data || error.message);
     res.status(500).json({ 
       success: false, 
-      error: error.response?.data?.description || "Failed to send invoice" 
+      error: error.response?.data?.description || "Failed to create invoice link" 
     });
   }
 }
