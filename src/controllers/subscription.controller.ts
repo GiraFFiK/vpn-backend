@@ -1,5 +1,6 @@
-import { prisma } from "../prisma";
 import crypto from "crypto";
+import { getSubscriptionPlan } from "../config/subscriptionPlans";
+import { prisma } from "../prisma";
 
 export async function getSubscription(req: any, res: any) {
   const { telegramId } = req.params;
@@ -29,9 +30,15 @@ export async function getSubscription(req: any, res: any) {
 
 export async function purchaseSubscription(req: any, res: any) {
   const { telegramId } = req.params;
-  const { plan, stars } = req.body;
+  const { plan } = req.body;
 
   try {
+    const subscriptionPlan = getSubscriptionPlan(plan);
+
+    if (!subscriptionPlan || !subscriptionPlan.active) {
+      return res.status(400).json({ error: "Invalid subscription plan" });
+    }
+
     const user = await prisma.user.findUnique({
       where: { telegramId }
     });
@@ -40,20 +47,11 @@ export async function purchaseSubscription(req: any, res: any) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Расчет дней в зависимости от плана
-    const daysMap: Record<string, number> = {
-      month: 30,
-      "3months": 90,
-      "6months": 180,
-      year: 365
-    };
+    const days = subscriptionPlan.days;
 
-    const days = daysMap[plan] || 30;
-    
-    // Вычисляем новую дату окончания подписки
     const now = new Date();
     let startDate = now;
-    
+
     if (user.subscriptionUntil && user.subscriptionUntil > now) {
       startDate = user.subscriptionUntil;
     }
@@ -61,28 +59,25 @@ export async function purchaseSubscription(req: any, res: any) {
     const expiresAt = new Date(startDate);
     expiresAt.setDate(expiresAt.getDate() + days);
 
-    // Обновляем подписку
-    const updatedUser = await prisma.user.update({
+    await prisma.user.update({
       where: { telegramId },
       data: {
         subscriptionUntil: expiresAt
       }
     });
 
-    // Создаем запись о покупке
     await (prisma as any).purchase.create({
       data: {
         userId: telegramId,
-        plan: plan,
-        stars: stars,
-        expiresAt: expiresAt
+        plan: subscriptionPlan.id,
+        stars: subscriptionPlan.stars,
+        expiresAt
       }
     });
 
-    // Генерируем новый код активации
-    const randomBytes = crypto.randomBytes(8).toString('hex').toUpperCase();
-    const newCode = randomBytes.match(/.{1,4}/g)?.join('-') || randomBytes;
-    
+    const randomBytes = crypto.randomBytes(8).toString("hex").toUpperCase();
+    const newCode = randomBytes.match(/.{1,4}/g)?.join("-") || randomBytes;
+
     const activationCode = await (prisma as any).activationCode.upsert({
       where: { userId: telegramId },
       update: { code: newCode },
@@ -92,13 +87,14 @@ export async function purchaseSubscription(req: any, res: any) {
       }
     });
 
-    console.log(`✅ Подписка оформлена для ${telegramId}: +${days} дней, списано ${stars} звезд`);
+    console.log(`вњ… РџРѕРґРїРёСЃРєР° РѕС„РѕСЂРјР»РµРЅР° РґР»СЏ ${telegramId}: +${days} РґРЅРµР№, СЃРїРёСЃР°РЅРѕ ${subscriptionPlan.stars} Р·РІРµР·Рґ`);
 
     res.json({
       success: true,
       subscriptionUntil: expiresAt,
       daysLeft: days,
-      activationCode: activationCode.code
+      activationCode: activationCode.code,
+      starsCharged: subscriptionPlan.stars
     });
   } catch (error) {
     console.error(error);

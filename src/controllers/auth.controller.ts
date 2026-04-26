@@ -1,26 +1,43 @@
 import { prisma } from "../prisma";
-import { verifyTelegram } from "../middlewares/telegramAuth";
+import { parseTelegramInitData, verifyTelegram } from "../middlewares/telegramAuth";
 import crypto from "crypto";
 
 export async function auth(req: any, res: any) {
   const { initData } = req.body;
 
   try {
-    let userData;
-    try {
-      userData = JSON.parse(initData);
-    } catch {
-      userData = { user: initData };
+    if (!initData || typeof initData !== "string") {
+      return res.status(400).json({ error: "Telegram initData is required" });
     }
 
-    const userId = userData.user?.id || userData.id;
-    if (!userId) {
+    const isVerified = verifyTelegram(initData);
+    const parsedInitData = parseTelegramInitData(initData);
+    const allowUnsafeAuth = process.env.ALLOW_UNSAFE_TELEGRAM_AUTH === "true";
+
+    if ((!isVerified || !parsedInitData?.user?.id) && !allowUnsafeAuth) {
+      return res.status(401).json({ error: "Invalid Telegram auth data" });
+    }
+
+    let userData = parsedInitData;
+
+    if (!userData && allowUnsafeAuth) {
+      try {
+        userData = JSON.parse(initData);
+      } catch {
+        userData = null;
+      }
+    }
+
+    const telegramUser = userData?.user;
+    const userId = telegramUser?.id;
+    if (!telegramUser || !userId) {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    const username = userData.user?.username || userData.username || "";
-    const firstName = userData.user?.first_name || userData.first_name || "User";
-    const lastName = userData.user?.last_name || userData.last_name || "";
+    const username = telegramUser.username || "";
+    const firstName = telegramUser.first_name || "User";
+    const lastName = telegramUser.last_name || "";
+    const photoUrl = telegramUser.photo_url || null;
 
     // Ищем пользователя
     let dbUser = await prisma.user.findUnique({
@@ -28,7 +45,7 @@ export async function auth(req: any, res: any) {
     });
 
     // Проверяем, был ли пользователь приглашен кем-то
-    const invitedBy = userData.invitedBy ? String(userData.invitedBy) : null;
+    const invitedBy = dbUser?.invitedBy || null;
 
     if (!dbUser) {
       // Создаем нового пользователя
@@ -40,6 +57,7 @@ export async function auth(req: any, res: any) {
           username: username,
           firstName: firstName,
           lastName: lastName,
+          photoUrl,
           referralCode: referralCode,
           invitedBy: invitedBy
         }
@@ -56,7 +74,8 @@ export async function auth(req: any, res: any) {
       const needsUpdate = 
         (dbUser.username?.startsWith('user_') && username) ||
         (dbUser.firstName === "User" && firstName !== "User") ||
-        (dbUser.lastName === "" && lastName);
+        (dbUser.lastName === "" && lastName) ||
+        (!dbUser.photoUrl && photoUrl);
 
       if (needsUpdate) {
         console.log("📝 Обновляем данные пользователя...");
@@ -65,7 +84,8 @@ export async function auth(req: any, res: any) {
           data: {
             username: username || dbUser.username,
             firstName: firstName || dbUser.firstName,
-            lastName: lastName || dbUser.lastName
+            lastName: lastName || dbUser.lastName,
+            photoUrl: photoUrl || dbUser.photoUrl
           }
         });
         console.log("✅ Данные обновлены:", { username, firstName, lastName });
