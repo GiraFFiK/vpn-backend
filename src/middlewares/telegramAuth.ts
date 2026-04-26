@@ -10,7 +10,7 @@ function getTelegramSecret() {
     throw new Error("BOT_TOKEN is required for Telegram auth verification");
   }
 
-  return crypto.createHash("sha256").update(botToken).digest();
+  return crypto.createHmac("sha256", "WebAppData").update(botToken).digest();
 }
 
 function isUnsafeTelegramAuthAllowed() {

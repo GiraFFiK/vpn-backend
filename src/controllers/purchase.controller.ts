@@ -4,28 +4,28 @@ export async function getPurchaseHistory(req: any, res: any) {
   const { telegramId } = req.params;
 
   try {
-    console.log("рџ“Љ Р—Р°РїСЂРѕСЃ РёСЃС‚РѕСЂРёРё РїРѕРєСѓРїРѕРє РґР»СЏ:", telegramId);
+    console.log("Запрос истории покупок для:", telegramId);
 
     const purchases = await (prisma as any).purchase.findMany({
       where: { userId: telegramId },
       orderBy: {
-        purchasedAt: "desc"
-      }
+        purchasedAt: "desc",
+      },
     });
 
-    console.log(`вњ… РќР°Р№РґРµРЅРѕ ${purchases.length} Р·Р°РїРёСЃРµР№`);
+    console.log(`Найдено ${purchases.length} записей`);
 
     const formattedPurchases = purchases.map((p: any) => ({
       id: p.id,
       date: new Date(p.purchasedAt).toLocaleDateString("ru-RU"),
       plan: p.plan,
       stars: p.stars,
-      status: new Date(p.expiresAt) > new Date() ? "active" : "expired"
+      status: new Date(p.expiresAt) > new Date() ? "active" : "expired",
     }));
 
     res.json(formattedPurchases);
   } catch (error) {
-    console.error("вќЊ РћС€РёР±РєР° РїСЂРё РїРѕР»СѓС‡РµРЅРёРё РёСЃС‚РѕСЂРёРё РїРѕРєСѓРїРѕРє:", error);
+    console.error("Ошибка при получении истории покупок:", error);
     res.status(500).json({ error: "Server error" });
   }
 }
@@ -34,7 +34,7 @@ export async function getBonusHistory(req: any, res: any) {
   const { telegramId } = req.params;
 
   try {
-    console.log("рџЋЃ Р—Р°РїСЂРѕСЃ РёСЃС‚РѕСЂРёРё Р±РѕРЅСѓСЃРѕРІ РґР»СЏ:", telegramId);
+    console.log("Запрос истории бонусов для:", telegramId);
 
     const user = await prisma.user.findUnique({
       where: { telegramId },
@@ -42,10 +42,10 @@ export async function getBonusHistory(req: any, res: any) {
         invitedUsers: {
           where: { bonusGiven: true },
           include: {
-            invitedUser: true
-          }
-        }
-      }
+            invitedUser: true,
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -56,10 +56,10 @@ export async function getBonusHistory(req: any, res: any) {
       id: inv.id,
       date: new Date(inv.activatedAt || inv.invitedAt).toLocaleDateString("ru-RU"),
       type: "referral_bonus",
-      description: `Р‘РѕРЅСѓСЃ Р·Р° РїСЂРёРіР»Р°С€РµРЅРёРµ @${inv.invitedUser.username || "РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"}`,
+      description: `Бонус за приглашение @${inv.invitedUser.username || "пользователя"}`,
       stars: 0,
       days: 3,
-      status: "active"
+      status: "active",
     }));
 
     if (user.hasClaimedBonus) {
@@ -67,16 +67,16 @@ export async function getBonusHistory(req: any, res: any) {
         id: "first_bonus",
         date: new Date(user.createdAt).toLocaleDateString("ru-RU"),
         type: "welcome_bonus",
-        description: "Р‘РѕРЅСѓСЃ Р·Р° РїРµСЂРІС‹Р№ РІС…РѕРґ",
+        description: "Бонус за первый вход",
         stars: 0,
         days: 3,
-        status: "active"
+        status: "active",
       });
     }
 
     res.json(bonusHistory);
   } catch (error) {
-    console.error("вќЊ РћС€РёР±РєР° РїСЂРё РїРѕР»СѓС‡РµРЅРёРё РёСЃС‚РѕСЂРёРё Р±РѕРЅСѓСЃРѕРІ:", error);
+    console.error("Ошибка при получении истории бонусов:", error);
     res.status(500).json({ error: "Server error" });
   }
 }
@@ -85,11 +85,11 @@ export async function getFullHistory(req: any, res: any) {
   const { telegramId } = req.params;
 
   try {
-    console.log("рџ“љ Р—Р°РїСЂРѕСЃ РїРѕР»РЅРѕР№ РёСЃС‚РѕСЂРёРё РґР»СЏ:", telegramId);
+    console.log("Запрос полной истории для:", telegramId);
 
     const purchases = await (prisma as any).purchase.findMany({
       where: { userId: telegramId },
-      orderBy: { purchasedAt: "desc" }
+      orderBy: { purchasedAt: "desc" },
     });
 
     const user = await prisma.user.findUnique({
@@ -98,10 +98,10 @@ export async function getFullHistory(req: any, res: any) {
         invitedUsers: {
           where: { bonusGiven: true },
           include: {
-            invitedUser: true
-          }
-        }
-      }
+            invitedUser: true,
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -109,14 +109,14 @@ export async function getFullHistory(req: any, res: any) {
     }
 
     const wasInvited = await (prisma as any).invitedUser.findUnique({
-      where: { invitedUserId: telegramId }
+      where: { invitedUserId: telegramId },
     });
 
-    console.log("рџ”Ќ РРЅС„РѕСЂРјР°С†РёСЏ Рѕ РїРѕР»СЊР·РѕРІР°С‚РµР»Рµ:", {
+    console.log("Информация о пользователе:", {
       telegramId,
       hasClaimedBonus: user.hasClaimedBonus,
       wasInvited: !!wasInvited,
-      invitedBy: wasInvited?.referrerId
+      invitedBy: wasInvited?.referrerId,
     });
 
     const history: any[] = [];
@@ -129,10 +129,16 @@ export async function getFullHistory(req: any, res: any) {
         plan: p.plan,
         stars: p.stars,
         days: 0,
-        description: `РџРѕРєСѓРїРєР° ${p.plan === "month" ? "1 РјРµСЃСЏС†Р°" :
-                              p.plan === "3months" ? "3 РјРµСЃСЏС†РµРІ" :
-                              p.plan === "6months" ? "6 РјРµСЃСЏС†РµРІ" : "1 РіРѕРґР°"}`,
-        status: new Date(p.expiresAt) > new Date() ? "active" : "expired"
+        description: `Покупка ${
+          p.plan === "month"
+            ? "1 месяца"
+            : p.plan === "3months"
+              ? "3 месяцев"
+              : p.plan === "6months"
+                ? "6 месяцев"
+                : "1 года"
+        }`,
+        status: new Date(p.expiresAt) > new Date() ? "active" : "expired",
       });
     });
 
@@ -141,8 +147,8 @@ export async function getFullHistory(req: any, res: any) {
       const bonusDate = new Date(user.createdAt);
 
       const description = wasInvited
-        ? `рџЋЃ Р‘РѕРЅСѓСЃ Р·Р° РїРµСЂРІС‹Р№ РІС…РѕРґ + РїСЂРёРіР»Р°С€РµРЅРёРµ (6 РґРЅРµР№)`
-        : `рџЋЃ Р‘РѕРЅСѓСЃ Р·Р° РїРµСЂРІС‹Р№ РІС…РѕРґ (3 РґРЅСЏ)`;
+        ? "Бонус за первый вход + приглашение (6 дней)"
+        : "Бонус за первый вход (3 дня)";
 
       history.push({
         id: "welcome_bonus",
@@ -152,7 +158,7 @@ export async function getFullHistory(req: any, res: any) {
         stars: 0,
         days: bonusDays,
         description,
-        status: "active"
+        status: "active",
       });
     }
 
@@ -166,8 +172,8 @@ export async function getFullHistory(req: any, res: any) {
         plan: "bonus",
         stars: 0,
         days: 3,
-        description: `рџ‘Ґ Р‘РѕРЅСѓСЃ Р·Р° РїСЂРёРіР»Р°С€РµРЅРёРµ @${invitedUser?.username || "РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"}`,
-        status: "active"
+        description: `Бонус за приглашение @${invitedUser?.username || "пользователя"}`,
+        status: "active",
       });
     });
 
@@ -177,16 +183,16 @@ export async function getFullHistory(req: any, res: any) {
       return dateB.localeCompare(dateA);
     });
 
-    console.log(`вњ… РЎС„РѕСЂРјРёСЂРѕРІР°РЅРѕ ${history.length} Р·Р°РїРёСЃРµР№ РёСЃС‚РѕСЂРёРё`);
-    console.log("рџ“Љ Р”РµС‚Р°Р»Рё Р±РѕРЅСѓСЃРѕРІ:", {
+    console.log(`Сформировано ${history.length} записей истории`);
+    console.log("Детали бонусов:", {
       welcomeBonusDays: user.hasClaimedBonus ? (wasInvited ? 6 : 3) : 0,
       wasInvited: !!wasInvited,
-      referralBonuses: user.invitedUsers.length
+      referralBonuses: user.invitedUsers.length,
     });
 
     res.json(history);
   } catch (error) {
-    console.error("вќЊ РћС€РёР±РєР° РїСЂРё РїРѕР»СѓС‡РµРЅРёРё РїРѕР»РЅРѕР№ РёСЃС‚РѕСЂРёРё:", error);
+    console.error("Ошибка при получении полной истории:", error);
     res.status(500).json({ error: "Server error" });
   }
 }

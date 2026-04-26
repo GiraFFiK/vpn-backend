@@ -48,7 +48,6 @@ export async function purchaseSubscription(req: any, res: any) {
     }
 
     const days = subscriptionPlan.days;
-
     const now = new Date();
     let startDate = now;
 
@@ -87,7 +86,7 @@ export async function purchaseSubscription(req: any, res: any) {
       }
     });
 
-    console.log(`вњ… РџРѕРґРїРёСЃРєР° РѕС„РѕСЂРјР»РµРЅР° РґР»СЏ ${telegramId}: +${days} РґРЅРµР№, СЃРїРёСЃР°РЅРѕ ${subscriptionPlan.stars} Р·РІРµР·Рґ`);
+    console.log(`Subscription activated for ${telegramId}: +${days} days, charged ${subscriptionPlan.stars} stars`);
 
     res.json({
       success: true,
