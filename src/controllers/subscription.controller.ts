@@ -28,6 +28,38 @@ export async function getSubscription(req: any, res: any) {
   }
 }
 
+export async function getExpiringSubscriptions(req: any, res: any) {
+  try {
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+    const users = await prisma.user.findMany({
+      where: {
+        subscriptionUntil: {
+          gt: now,
+          lte: tomorrow,
+        },
+      },
+      select: {
+        telegramId: true,
+        firstName: true,
+        username: true,
+        subscriptionUntil: true,
+      },
+    });
+
+    res.json({
+      users: users.map((user) => ({
+        ...user,
+        daysLeft: 1,
+      })),
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Server error" });
+  }
+}
+
 export async function purchaseSubscription(req: any, res: any) {
   const { telegramId } = req.params;
   const { plan } = req.body;
