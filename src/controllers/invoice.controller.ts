@@ -35,17 +35,19 @@ export async function createInvoiceLink(req: any, res: any) {
       userId: authenticatedTelegramId,
       plan: subscriptionPlan.id,
       stars: subscriptionPlan.stars,
+      deviceLimit: subscriptionPlan.deviceLimit,
     });
 
     const response = await axios.post(
       `https://api.telegram.org/bot${botToken}/createInvoiceLink`,
       {
         title: "AuraVPN Подписка",
-        description: `Подписка на ${subscriptionPlan.title}`,
+        description: `AuraVPN на ${subscriptionPlan.title}`,
         payload: JSON.stringify({
           userId: authenticatedTelegramId,
           plan: subscriptionPlan.id,
           stars: subscriptionPlan.stars,
+          deviceLimit: subscriptionPlan.deviceLimit,
         }),
         provider_token: "",
         currency: "XTR",
@@ -59,6 +61,7 @@ export async function createInvoiceLink(req: any, res: any) {
     res.json({
       success: true,
       invoiceLink,
+      deviceLimit: subscriptionPlan.deviceLimit,
     });
   } catch (error: any) {
     console.error("Invoice creation failed:", error.response?.data || error.message);

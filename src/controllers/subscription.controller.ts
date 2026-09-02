@@ -118,14 +118,15 @@ export async function purchaseSubscription(req: any, res: any) {
       }
     });
 
-    console.log(`Subscription activated for ${telegramId}: +${days} days, charged ${subscriptionPlan.stars} stars`);
+    console.log(`Subscription activated for ${telegramId}: +${days} days, charged ${subscriptionPlan.stars} stars, up to ${subscriptionPlan.deviceLimit} devices`);
 
     res.json({
       success: true,
       subscriptionUntil: expiresAt,
       daysLeft: days,
       activationCode: activationCode.code,
-      starsCharged: subscriptionPlan.stars
+      starsCharged: subscriptionPlan.stars,
+      deviceLimit: subscriptionPlan.deviceLimit
     });
   } catch (error) {
     console.error(error);

@@ -4,6 +4,7 @@ export interface SubscriptionPlan {
   id: SubscriptionPlanId;
   stars: number;
   days: number;
+  deviceLimit: number;
   title: string;
   active: boolean;
 }
@@ -11,31 +12,35 @@ export interface SubscriptionPlan {
 export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanId, SubscriptionPlan> = {
   month: {
     id: "month",
-    stars: 50,
+    stars: 60,
     days: 30,
-    title: "1 месяц",
+    deviceLimit: 5,
+    title: "1 месяц, до 5 устройств",
     active: true,
   },
   "3months": {
     id: "3months",
-    stars: 130,
+    stars: 155,
     days: 90,
-    title: "3 месяца",
+    deviceLimit: 5,
+    title: "3 месяца, до 5 устройств",
     active: true,
   },
   "6months": {
     id: "6months",
-    stars: 280,
+    stars: 330,
     days: 180,
-    title: "6 месяцев",
-    active: false,
+    deviceLimit: 5,
+    title: "6 месяцев, до 5 устройств",
+    active: true,
   },
   year: {
     id: "year",
-    stars: 550,
+    stars: 650,
     days: 365,
-    title: "1 год",
-    active: false,
+    deviceLimit: 5,
+    title: "1 год, до 5 устройств",
+    active: true,
   },
 };
 
