@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { getSubscriptionPlan } from "../config/subscriptionPlans";
+import { getPurchasableSubscriptionPlan } from "../config/subscriptionPlans";
 import { prisma } from "../prisma";
 
 export async function getSubscription(req: any, res: any) {
@@ -7,7 +7,7 @@ export async function getSubscription(req: any, res: any) {
 
   try {
     const user = await prisma.user.findUnique({
-      where: { telegramId }
+      where: { telegramId },
     });
 
     if (!user) {
@@ -15,12 +15,19 @@ export async function getSubscription(req: any, res: any) {
     }
 
     const now = new Date();
-    const isActive = user.subscriptionUntil ? user.subscriptionUntil > now : false;
+    const isActive = user.subscriptionUntil
+      ? user.subscriptionUntil > now
+      : false;
 
     res.json({
       isActive,
       subscriptionUntil: user.subscriptionUntil,
-      daysLeft: isActive ? Math.ceil((user.subscriptionUntil!.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0
+      daysLeft: isActive
+        ? Math.ceil(
+            (user.subscriptionUntil!.getTime() - now.getTime()) /
+              (1000 * 60 * 60 * 24),
+          )
+        : 0,
     });
   } catch (error) {
     console.error(error);
@@ -62,24 +69,26 @@ export async function getExpiringSubscriptions(req: any, res: any) {
 
 export async function purchaseSubscription(req: any, res: any) {
   const { telegramId } = req.params;
-  const { plan } = req.body;
+  const { planId, period } = req.body;
 
   try {
-    const subscriptionPlan = getSubscriptionPlan(plan);
+    const subscription = getPurchasableSubscriptionPlan(planId, period);
 
-    if (!subscriptionPlan || !subscriptionPlan.active) {
-      return res.status(400).json({ error: "Invalid subscription plan" });
+    if (!subscription) {
+      return res
+        .status(403)
+        .json({ error: "This subscription plan is not available" });
     }
 
     const user = await prisma.user.findUnique({
-      where: { telegramId }
+      where: { telegramId },
     });
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const days = subscriptionPlan.days;
+    const days = subscription.days;
     const now = new Date();
     let startDate = now;
 
@@ -93,17 +102,17 @@ export async function purchaseSubscription(req: any, res: any) {
     await prisma.user.update({
       where: { telegramId },
       data: {
-        subscriptionUntil: expiresAt
-      }
+        subscriptionUntil: expiresAt,
+      },
     });
 
     await (prisma as any).purchase.create({
       data: {
         userId: telegramId,
-        plan: subscriptionPlan.id,
-        stars: subscriptionPlan.stars,
-        expiresAt
-      }
+        plan: subscription.plan.id,
+        stars: subscription.stars,
+        expiresAt,
+      },
     });
 
     const randomBytes = crypto.randomBytes(8).toString("hex").toUpperCase();
@@ -114,19 +123,21 @@ export async function purchaseSubscription(req: any, res: any) {
       update: { code: newCode },
       create: {
         userId: telegramId,
-        code: newCode
-      }
+        code: newCode,
+      },
     });
 
-    console.log(`Subscription activated for ${telegramId}: +${days} days, charged ${subscriptionPlan.stars} stars, up to ${subscriptionPlan.deviceLimit} devices`);
+    console.log(
+      `Subscription activated for ${telegramId}: +${days} days, charged ${subscription.stars} stars, up to ${subscription.plan.deviceLimit} devices`,
+    );
 
     res.json({
       success: true,
       subscriptionUntil: expiresAt,
       daysLeft: days,
       activationCode: activationCode.code,
-      starsCharged: subscriptionPlan.stars,
-      deviceLimit: subscriptionPlan.deviceLimit
+      starsCharged: subscription.stars,
+      deviceLimit: subscription.plan.deviceLimit,
     });
   } catch (error) {
     console.error(error);

@@ -1,8 +1,8 @@
 import axios from "axios";
-import { getSubscriptionPlan } from "../config/subscriptionPlans";
+import { getPurchasableSubscriptionPlan } from "../config/subscriptionPlans";
 
 export async function createInvoiceLink(req: any, res: any) {
-  const { plan } = req.body;
+  const { planId, period } = req.body;
   const botToken = process.env.BOT_TOKEN;
   const authenticatedTelegramId = req.telegramUserId;
 
@@ -21,38 +21,42 @@ export async function createInvoiceLink(req: any, res: any) {
     });
   }
 
-  const subscriptionPlan = getSubscriptionPlan(plan);
+  const subscription = getPurchasableSubscriptionPlan(planId, period);
 
-  if (!subscriptionPlan || !subscriptionPlan.active) {
-    return res.status(400).json({
+  if (!subscription) {
+    return res.status(403).json({
       success: false,
-      error: "Invalid subscription plan",
+      error: "This subscription plan is not available",
     });
   }
 
   try {
     console.log("Creating invoice:", {
       userId: authenticatedTelegramId,
-      plan: subscriptionPlan.id,
-      stars: subscriptionPlan.stars,
-      deviceLimit: subscriptionPlan.deviceLimit,
+      plan: subscription.plan.id,
+      period: subscription.period,
+      stars: subscription.stars,
+      deviceLimit: subscription.plan.deviceLimit,
     });
 
     const response = await axios.post(
       `https://api.telegram.org/bot${botToken}/createInvoiceLink`,
       {
         title: "AuraVPN Подписка",
-        description: `AuraVPN на ${subscriptionPlan.title}`,
+        description: `AuraVPN: ${subscription.plan.title}`,
         payload: JSON.stringify({
           userId: authenticatedTelegramId,
-          plan: subscriptionPlan.id,
-          stars: subscriptionPlan.stars,
-          deviceLimit: subscriptionPlan.deviceLimit,
+          planId: subscription.plan.id,
+          period: subscription.period,
+          priceStars: subscription.stars,
+          deviceLimit: subscription.plan.deviceLimit,
         }),
         provider_token: "",
         currency: "XTR",
-        prices: [{ label: subscriptionPlan.title, amount: subscriptionPlan.stars }],
-      }
+        prices: [
+          { label: subscription.plan.title, amount: subscription.stars },
+        ],
+      },
     );
 
     const invoiceLink = response.data.result;
@@ -61,13 +65,17 @@ export async function createInvoiceLink(req: any, res: any) {
     res.json({
       success: true,
       invoiceLink,
-      deviceLimit: subscriptionPlan.deviceLimit,
+      deviceLimit: subscription.plan.deviceLimit,
     });
   } catch (error: any) {
-    console.error("Invoice creation failed:", error.response?.data || error.message);
+    console.error(
+      "Invoice creation failed:",
+      error.response?.data || error.message,
+    );
     res.status(500).json({
       success: false,
-      error: error.response?.data?.description || "Failed to create invoice link",
+      error:
+        error.response?.data?.description || "Failed to create invoice link",
     });
   }
 }
